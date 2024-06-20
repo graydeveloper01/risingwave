@@ -3602,7 +3602,6 @@ impl CatalogManager {
         dropping_sink_id: Option<SinkId>,
         updated_sink_ids: Vec<SinkId>,
     ) -> MetaResult<NotificationVersion> {
-        println!("updated {:?}", updated_sink_ids);
         let core = &mut *self.core.lock().await;
         let database_core = &mut core.database;
         let mut tables = BTreeMapTransaction::new(&mut database_core.tables);
