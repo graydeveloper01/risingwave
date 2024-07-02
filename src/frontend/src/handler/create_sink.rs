@@ -768,9 +768,8 @@ pub(crate) fn derive_default_column_project_for_sink(
             continue;
         }
 
-        let default_col_expr = || -> ExprImpl {
-            rewrite_now_to_proctime(default_column_exprs[idx].clone())
-        };
+        let default_col_expr =
+            || -> ExprImpl { rewrite_now_to_proctime(default_column_exprs[idx].clone()) };
 
         let sink_col_expr = |sink_col_idx: usize| -> Result<ExprImpl> {
             derive_sink_to_table_expr(sink_schema, sink_col_idx, column.data_type())

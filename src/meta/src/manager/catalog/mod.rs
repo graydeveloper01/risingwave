@@ -1160,7 +1160,14 @@ impl CatalogManager {
 
                 if let Some((table, source)) = target_table {
                     version = self
-                        .finish_replace_table_procedure(&source, &table, None, Some(sink_id), None, vec![])
+                        .finish_replace_table_procedure(
+                            &source,
+                            &table,
+                            None,
+                            Some(sink_id),
+                            None,
+                            vec![],
+                        )
                         .await?;
                 }
 
