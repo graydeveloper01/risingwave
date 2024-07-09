@@ -22,10 +22,9 @@ use either::Either;
 use itertools::Itertools;
 use maplit::{convert_args, hashmap};
 use pgwire::pg_response::{PgResponse, StatementType};
-use risingwave_common::catalog::{ConnectionId, DatabaseId, Schema, SchemaId, TableId, UserId};
-use risingwave_common::array::arrow::{FromArrow, IcebergArrowConvert};
+use risingwave_common::array::arrow::IcebergArrowConvert;
 use risingwave_common::catalog::{
-    ColumnCatalog,
+    ColumnCatalog, ConnectionId, DatabaseId, Schema, SchemaId, TableId, UserId,
 };
 use risingwave_common::types::DataType;
 use risingwave_common::{bail, catalog};
@@ -36,8 +35,6 @@ use risingwave_connector::sink::{
 };
 use risingwave_pb::catalog::{PbSource, Table};
 use risingwave_pb::ddl_service::{ReplaceTablePlan, TableJobType};
-
-use risingwave_pb::plan_common::PbField;
 use risingwave_pb::stream_plan::stream_fragment_graph::Parallelism;
 use risingwave_pb::stream_plan::stream_node::{NodeBody, PbNodeBody};
 use risingwave_pb::stream_plan::{MergeNode, StreamFragmentGraph, StreamNode};
