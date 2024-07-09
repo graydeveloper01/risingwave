@@ -22,7 +22,7 @@ use super::utils::impl_distill_by_unit;
 use super::{generic, ExprRewritable, PlanBase, PlanRef, PlanTreeNodeUnary, StreamNode};
 use crate::expr::{ExprRewriter, ExprVisitor};
 use crate::optimizer::plan_node::expr_visitable::ExprVisitable;
-use crate::optimizer::property::{analyze_monotonicity, monotonicity_variants};
+use crate::optimizer::property::{analyze_monotonicity, monotonicity_variants, MonotonicityMap};
 use crate::stream_fragmenter::BuildFragmentGraphState;
 use crate::utils::ColIndexMappingRewriteExt;
 
@@ -45,26 +45,39 @@ impl StreamProjectSet {
             .i2o_col_mapping()
             .rewrite_provided_distribution(input.distribution());
 
+        let mut out_watermark_columns = FixedBitSet::with_capacity(core.output_len());
+        let mut out_monotonicity_map = MonotonicityMap::new();
         let mut watermark_derivations = vec![];
         let mut nondecreasing_exprs = vec![];
-        let mut watermark_columns = FixedBitSet::with_capacity(core.output_len());
         for (expr_idx, expr) in core.select_list.iter().enumerate() {
+            let out_expr_idx = expr_idx + 1;
+
             use monotonicity_variants::*;
             match analyze_monotonicity(expr) {
-                FollowingInput(input_idx) => {
-                    if input.watermark_columns().contains(input_idx) {
-                        watermark_derivations.push((input_idx, expr_idx));
-                        watermark_columns.insert(expr_idx + 1);
+                Inherent(monotonicity) => {
+                    if matches!(monotonicity, NonDecreasing | Constant) {
+                        // We can only propagate non-decreasing/constant monotonicity, because we will produce
+                        // NULLs after all values of the column are consumed. Only non-decreasing/constant
+                        // monotonicity can hold even after appending several NULLs.
+                        out_monotonicity_map.insert(out_expr_idx, monotonicity);
+                    }
+                    if monotonicity.is_non_decreasing() {
+                        nondecreasing_exprs.push(expr_idx); // to produce watermarks
+                        out_watermark_columns.insert(out_expr_idx);
                     }
                 }
-                Inherent(NonDecreasing) => {
-                    nondecreasing_exprs.push(expr_idx);
-                    watermark_columns.insert(expr_idx + 1);
+                FollowingInput(input_idx) => {
+                    let in_monotonicity = input.columns_monotonicity()[input_idx];
+                    if matches!(in_monotonicity, NonDecreasing | Constant) {
+                        // same as above
+                        out_monotonicity_map.insert(out_expr_idx, in_monotonicity);
+                    }
+                    if input.watermark_columns().contains(input_idx) {
+                        watermark_derivations.push((input_idx, expr_idx)); // to propagate watermarks
+                        out_watermark_columns.insert(out_expr_idx);
+                    }
                 }
-                Inherent(Constant) => {
-                    // XXX(rc): we can produce one watermark on each recovery for this case.
-                }
-                Inherent(_) | _FollowingInputInversely(_) => {}
+                _FollowingInputInversely(_) => {}
             }
         }
 
@@ -75,7 +88,8 @@ impl StreamProjectSet {
             distribution,
             input.append_only(),
             input.emit_on_window_close(),
-            watermark_columns,
+            out_watermark_columns,
+            out_monotonicity_map,
         );
         StreamProjectSet {
             base,

@@ -68,6 +68,7 @@ impl StreamDeltaJoin {
             let watermark_columns = from_left.bitand(&from_right);
             core.i2o_col_mapping().rewrite_bitset(&watermark_columns)
         };
+
         // TODO: derive from input
         let base = PlanBase::new_stream_with_core(
             &core,
@@ -75,6 +76,7 @@ impl StreamDeltaJoin {
             append_only,
             false, // TODO(rc): derive EOWC property from input
             watermark_columns,
+            Default::default(),
         );
 
         Self {
